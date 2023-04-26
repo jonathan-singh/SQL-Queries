@@ -1,0 +1,50 @@
+DECLARE @sdate as date
+DECLARE @edate as date
+SET @sdate = '2022-09-08'
+--(select cast(min(order_date) as date) from t_order o (nolock) where status in ('RELEASED') and order_type = 'ECOM')
+SET @edate = '2023-04-25'
+--(select cast(max(order_date) as date) from t_order o (nolock) where status in ('RELEASED') and order_type = 'ECOM')
+select a.order_number, o.order_date, item_number, order_qty, picked_qty, order_qty
+- picked_qty qty_needed, where_else AS "Inv_QTY" from
+(select o.order_number,
+ d.item_number,
+ count(d.qty) order_qty, 
+ sum(p.picked_quantity) picked_qty,
+  isnull((
+  SELECT sum(isnull(actual_qty,0)) AS else_qty
+  FROM t_stored_item stg (nolock)
+  WHERE 
+   stg.location_id NOT LIKE 'LOST%'
+  AND  stg.location_id NOT LIKE 'OUT%'
+   AND  stg.location_id NOT LIKE 'MU%'
+  AND  stg.location_id NOT LIKE 'PACKRES%'
+  AND  stg.location_id NOT LIKE 'RTV%'
+  AND  stg.location_id NOT LIKE 'SEVDON%'
+  AND UPPER( stg.location_id) NOT LIKE '%DAM%'
+  AND ( stg.location_id NOT LIKE 'SHIP-[0-9][0-9]-STG%')
+  AND  stg.location_id NOT LIKE 'SHIP%'
+  AND  stg.location_id NOT LIKE 'PICKCONVEYOR%'
+  AND  stg.location_id NOT LIKE '%PRS%'
+  AND  stg.location_id NOT LIKE '%RMA%'
+  AND  stg.location_id NOT LIKE '%PHOTOLAB%'
+  AND  stg.location_id NOT LIKE '%RECSTAGE%'
+    AND  stg.location_id NOT LIKE 'INVSTAGE%'
+  AND  stg.location_id NOT LIKE '%REC-HOLD%'
+  AND  stg.location_id NOT LIKE '%PICKMODIC-STAGE%'
+  AND stg.item_number = d.item_number
+  GROUP BY item_number
+ ),0) where_else
+from t_order o (nolock)
+join t_order_detail d (nolock) on d.order_number = o.order_number
+join t_pick_detail p (nolock) on p.order_number = o.order_number and p.line_number
+= d.line_number and p.item_number = d.item_number and p.status not in 
+('CANCELLED')
+where cast(order_date as date) between @sdate and @edate and o.status NOT IN 
+('SHIPPED','CANCELLED','PACKED','LOADED','S', 'PROCESSING', 'SHIPPING', 'ERROR')
+and o.order_type IN ('SM', 'EO', 'ECOM', 'EMP')
+and wcs_status in ('R', 'M', 'P', 'S', 'A')
+--and wcs_status in ('P', 'S', 'M')
+group by o.order_number, d.item_number) a
+join t_order o (nolock) on o.order_number = a.order_number
+where (order_qty - picked_qty) > 0 and (where_else = '0')
+order by item_number asc
