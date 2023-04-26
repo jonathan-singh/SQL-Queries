@@ -1,0 +1,32 @@
+select latest_ship_date,
+sum(case when wcs_status = 'A' then 1 else 0 end) 'Prioritized',
+sum(case when wcs_status = 'R' then 1 else 0 end) 'Released',
+sum(case when wcs_status = 'S' then 1 else 0 end) 'Sorter Chute',
+sum(case when wcs_status = 'M' then 1 else 0 end) 'Matching',
+sum(case when wcs_status = 'P' then 1 else 0 end) 'Problem Res',
+sum(case when wcs_status = 'C' then 1 else 0 end) 'Complete',
+sum(case when wcs_status in ('A', 'R', 'S', 'M', 'P', 'C') then 1 else 0 end) 'Total'
+from
+(select o.order_number, o.wcs_status, cast(o.latest_ship_date as date) latest_ship_date from t_order o (nolock)
+where o.status = 'RELEASED' and order_type <> 'RT') a
+group by cast(latest_ship_date as date)
+order by cast(latest_ship_date as date) asc
+SELECT latest_ship_date,
+CASE WHEN a.wcs_status = 'A' then 'Prioritized'
+	 WHEN a.wcs_status = 'R' then 'Released'
+	 WHEN a.wcs_status = 'S' then 'Sorter Chute'
+	 WHEN a.wcs_status = 'M' then 'Matching'
+	 WHEN a.wcs_status = 'P' then 'Problem Res'
+	 WHEN a.wcs_status = 'C' then 'Complete' END as COFE_Status,
+COUNT(DISTINCT(order_number)) order_count,
+SUM(units) as units
+FROM
+(SELECT o.order_number, o.wcs_status, CAST(o.latest_ship_date as DATE) latest_ship_date, COUNT(ord.line_number) as "units" FROM t_order o WITH(NOLOCK)
+JOIN t_order_detail ord WITH(NOLOCK) ON o.order_number = ord.order_number
+WHERE o.status = 'RELEASED'
+AND order_type <> 'RT'
+GROUP BY o.order_number, wcs_status, o.latest_ship_date) a
+WHERE a.latest_ship_date = '2023-04-25'
+--AND [units] = 1
+GROUP BY CAST(latest_ship_date as DATE), wcs_status
+ORDER BY CAST(latest_ship_date as DATE) ASC
