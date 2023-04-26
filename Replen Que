@@ -1,0 +1,10 @@
+--Replen Queue Aging--
+--update create date to 72 hours before the current date
+select
+pick_id,item_number,pick_location,priority,zone,staged_quantity,planned_quantity,status,destination_replen_area,put_quantity,picked_quantity,container_id
+from t_pick_detail with (NOLOCK)
+where create_date>='2023-04-02'  and work_type='27'
+--status = 'RELEASED' AND picked_quantity='0' and
+--and pick_location is not null
+and status not in ('CLOSED')
+--and priority not in ( '75','70')
